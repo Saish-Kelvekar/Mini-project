@@ -1,0 +1,15 @@
+{
+  "name": "e4-server",
+  "version": "0.1.0",
+  "description": "E4 - Secure Access & Web Interface Engine: Express API (JWT + role-permission matrix)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
