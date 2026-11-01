@@ -73,8 +73,8 @@ export default function EventForm({ goTo }) {
           {field('judgesRequired', 'Judges required', <input inputMode="numeric" value={v.judgesRequired} onChange={set('judgesRequired')} />)}
         </div>
         {field('resourcesRequired', 'Resources required',
-          <textarea rows="3" placeholder="e.g., Projector, Audio/Mic system, High-speed Wi-Fi, 40 Laptops, Whiteboard" value={v.resourcesRequired} onChange={set('resourcesRequired')} />,
-          'List equipment, hardware, lab setup, or room resources needed')}
+          <textarea rows="3" placeholder="e.g., Projector, Audio/Mic system, Whiteboard" value={v.resourcesRequired} onChange={set('resourcesRequired')} />,
+          'List equipment, hardware resources needed')}
         <div className="row">
           {field('preferredVenue', 'Preferred venue (optional)', <input value={v.preferredVenue} onChange={set('preferredVenue')} />)}
           {field('preferredDate', 'Preferred date (optional)', <input placeholder="YYYY-MM-DD" value={v.preferredDate} onChange={set('preferredDate')} />)}
