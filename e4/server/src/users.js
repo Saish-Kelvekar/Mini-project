@@ -12,23 +12,23 @@ const DEV_PASSWORDS = {
 };
 
 const seed = [
-  { id: "u1", name: "Asha Admin", email: "admin@college.test", role: "admin" },
+  { id: "u1", name: " Admin", email: "admin@college.test", role: "admin" },
   {
     id: "u2",
-    name: "Carl Coordinator",
+    name: " Coordinator",
     email: "coord1@college.test",
     role: "coordinator",
   },
   {
     id: "u3",
-    name: "Chitra Coordinator",
+    name: " Coordinator",
     email: "coord2@college.test",
     role: "coordinator",
   },
-  { id: "u4", name: "Jay Judge", email: "judge@college.test", role: "judge" },
+  { id: "u4", name: " Judge", email: "judge@college.test", role: "judge" },
   {
     id: "u5",
-    name: "Sana Student",
+    name: " Student",
     email: "student@college.test",
     role: "student",
   },
