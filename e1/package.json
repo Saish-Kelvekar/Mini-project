@@ -1,0 +1,9 @@
+{
+  "name": "e1-timetable",
+  "version": "0.1.0",
+  "description": "E1 - Timetable Generation & Optimization: DSATUR graph colouring, sweep-line + interval tree, rule-based conflict classification",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}
