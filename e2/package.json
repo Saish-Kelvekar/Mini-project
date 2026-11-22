@@ -1,0 +1,21 @@
+{
+  "name": "e2-resource-engine",
+  "version": "1.0.0",
+  "description": "Engine 2 - Resource Availability & Allocation Engine (Node.js)",
+  "main": "e2_engine.js",
+  "scripts": {
+    "start": "node server.js",
+    "demo": "node demo.js",
+    "test": "node test/run_all.js",
+    "test:unit": "node test_e2.js",
+    "test:server": "node test_server.js",
+    "test:adapters": "node test/adapters.test.js",
+    "test:concurrency": "node test/concurrency.test.js"
+  },
+  "optionalDependencies": {
+    "pg": "^8.23.1"
+  },
+  "engines": {
+    "node": ">=20.10.0"
+  }
+}
