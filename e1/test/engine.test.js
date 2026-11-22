@@ -1,4 +1,4 @@
-// End-to-end tests of generateTimetable: placement, E2 BUSY retries, critical conflicts, participants.
+// End-to-end tests of generateTimetable: placement, E2 BUSY retries, critical conflicts.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -81,29 +81,17 @@ test('critical only when no feasible allocation remains', async () => {
   assert.equal(r.conflicts[0].type, 'UNPLACED');
 });
 
-test('keeps registered students out of overlapping events when possible', async () => {
-  const reg = (ids) => ids.map((studentId) => ({ studentId }));
-  const r = await generateTimetable([
-    ev(1, { registrations: reg(['s1', 's2']), judgesRequired: 0 }),
-    ev(2, { registrations: reg(['s1']), judgesRequired: 0 }),
-    ev(3, { registrations: reg(['s3']), judgesRequired: 0 }),
-  ], opts());
-  const by = Object.fromEntries(r.entries.map((e) => [e.eventId, e]));
-  assert.equal(clash(by[1], by[2]), false);
-  assert.equal(r.summary.participant, 0);
-  assert.equal(by[1].start, by[3].start); // compatible group runs in parallel
-});
-
-test('participant overlap is a warning when it cannot be avoided', async () => {
+test('ignores registrations: they never change the timetable', async () => {
+  // Students register only after the timetable is published, so E1 must give
+  // the same timetable whether or not registrations are present.
   const reg = [{ studentId: 's1' }];
-  const r = await generateTimetable([
-    ev(1, { registrations: reg, durationMinutes: 540, judgesRequired: 0 }),
-    ev(2, { registrations: reg, durationMinutes: 540, judgesRequired: 0 }),
-  ], opts({ horizonDays: 1 }));
-  assert.equal(r.entries.length, 2);
-  const p = r.conflicts.find((c) => c.category === 'participant');
-  assert.equal(p.status, 'warning');
-  assert.equal(r.summary.critical, 0);
+  const plain = [ev(1, { judgesRequired: 0 }), ev(2, { judgesRequired: 0 })];
+  const withReg = plain.map((e) => ({ ...e, registrations: reg }));
+  const a = await generateTimetable(plain, opts());
+  const b = await generateTimetable(withReg, opts());
+  const slots = (r) => r.entries.map((e) => `${e.eventId} ${e.venue} ${e.date} ${e.start}-${e.end}`);
+  assert.deepEqual(slots(b), slots(a));
+  assert.equal(b.entries[0].start, b.entries[1].start); // both run in parallel at 09:00
 });
 
 test('respects existing schedules from E3', async () => {
@@ -149,14 +137,13 @@ test('500 events scheduled in <= 2 s with no double booking', async () => {
     preferredVenue: rnd() < 0.6 ? pick(venues) : '',
     preferredDate: rnd() < 0.7 ? pick(dates) : '',
     resourcesRequired: rnd() < 0.3 ? pick(items) : '',
-    registrations: Array.from({ length: Math.floor(rnd() * 20) }, () => ({ studentId: `s${Math.floor(rnd() * 800)}` })),
   }));
 
   const t0 = performance.now();
   const r = await generateTimetable(events, { venues, judges, startDate: '2026-12-01', horizonDays: 30 });
   const ms = performance.now() - t0;
   console.log(`  500 events: ${ms.toFixed(0)} ms, placed ${r.summary.placed}, unplaced ${r.summary.unplaced}, ` +
-              `groups ${r.summary.groups}, conflicts c/r/p/a = ${r.summary.critical}/${r.summary.resource}/${r.summary.participant}/${r.summary.acceptable}`);
+              `groups ${r.summary.groups}, conflicts c/r/a = ${r.summary.critical}/${r.summary.resource}/${r.summary.acceptable}`);
 
   assert.ok(ms <= 2000, `took ${ms.toFixed(0)} ms`);
   assert.equal(r.summary.placed + r.summary.unplaced, 500);

@@ -61,7 +61,7 @@ test('sweep-line: simple timetable example', () => {
 });
 
 test('DSATUR gives a proper colouring and starts with the most constrained event', () => {
-  // Event 0 shares a student with 1, 2, 3 (most constrained); 1 and 2 share a projector.
+  // Event 0 shares a key with 1, 2, 3 (most constrained); 1 and 2 share a projector.
   const events = [
     { keys: ['s1', 's2', 's3'] }, { keys: ['s1', 'proj'] }, { keys: ['s2', 'proj'] }, { keys: ['s3'] }, { keys: [] },
   ];
@@ -88,20 +88,20 @@ test('classification rules', () => {
   assert.equal(classify({ busy: true }).category, 'resource');   // E2 BUSY is not critical
   assert.equal(classify({ busy: true }).status, 'resolved');
   assert.equal(classify({ moved: true }).category, 'resource');
-  const a = { venue: 'Lab 1', judgeIds: ['j1'], resources: ['projector'], participants: ['s1'] };
-  assert.equal(classify(pairFacts(a, { venue: 'Lab 1', judgeIds: [], resources: [], participants: [] })).category, 'critical');
-  assert.equal(classify(pairFacts(a, { venue: 'Lab 2', judgeIds: ['j1'], resources: [], participants: [] })).category, 'critical');
-  assert.equal(classify(pairFacts(a, { venue: 'Lab 2', judgeIds: [], resources: [], participants: ['s1'] })).category, 'participant');
-  assert.equal(classify(pairFacts(a, { venue: 'Lab 2', judgeIds: [], resources: [], participants: [] })).category, 'acceptable');
+  const a = { venue: 'Lab 1', judgeIds: ['j1'], resources: ['projector'] };
+  assert.equal(classify(pairFacts(a, { venue: 'Lab 1', judgeIds: [], resources: [] })).category, 'critical');
+  assert.equal(classify(pairFacts(a, { venue: 'Lab 2', judgeIds: ['j1'], resources: [] })).category, 'critical');
+  assert.equal(classify(pairFacts(a, { venue: 'Lab 2', judgeIds: [], resources: ['projector'] })).category, 'critical');
+  assert.equal(classify(pairFacts(a, { venue: 'Lab 2', judgeIds: [], resources: [] })).category, 'acceptable');
   assert.equal(classify({}), null); // no overlap, nothing to report
 });
 
-test('conflict ranking: critical > resource > participant > acceptable, then by time', () => {
+test('conflict ranking: critical > resource > acceptable, then by time', () => {
   const conflict = (category, start) => ({ category, severity: SEVERITY[category], start });
   const ranked = rankConflicts([
-    conflict('acceptable', 1), conflict('participant', 5), conflict('critical', 9),
-    conflict('resource', 2), conflict('participant', 3),
+    conflict('acceptable', 1), conflict('resource', 5), conflict('critical', 9),
+    conflict('resource', 2), conflict('acceptable', 3),
   ]);
   assert.deepEqual(ranked.map((c) => `${c.category}@${c.start}`),
-    ['critical@9', 'resource@2', 'participant@3', 'participant@5', 'acceptable@1']);
+    ['critical@9', 'resource@2', 'resource@5', 'acceptable@1', 'acceptable@3']);
 });

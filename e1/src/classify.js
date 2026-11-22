@@ -1,8 +1,11 @@
 // =============================================================================
 // RULE-BASED CONFLICT CLASSIFICATION
 // Flowchart step 5 ("Conflict / overlap classification").
-// Doc 4.18: identifies acceptable, resource, participant and unresolved critical conflicts.
-// Doc 4.17: report order is critical > resource > participant > acceptable.
+// Doc 4.18: identifies acceptable, resource and unresolved critical conflicts.
+// Report order is critical > resource > acceptable.
+// Student clashes are not handled here: students register only after the
+// timetable is published, and an overlapping registration is just a warning
+// shown by the website at that time.
 //
 // E1 first collects plain FACTS about a problem (was the event left unplaced?
 // do two events share a judge? did E2 say BUSY?). The rules below are checked
@@ -13,8 +16,7 @@
 const SEVERITY = {
   critical: 0,
   resource: 1,
-  participant: 2,
-  acceptable: 3,
+  acceptable: 2,
 };
 
 const RULES = [
@@ -42,12 +44,6 @@ const RULES = [
     status: 'resolved',
   },
   {
-    name: 'The same students are registered for two overlapping events',
-    matches: (facts) => facts.overlap && facts.sharedParticipants.length > 0,
-    category: 'participant',
-    status: 'warning',
-  },
-  {
     name: 'Events run in parallel in different venues with nothing shared',
     matches: (facts) => facts.overlap,
     category: 'acceptable',
@@ -63,7 +59,6 @@ const DEFAULT_FACTS = {
   sharedVenue: false,
   sharedJudges: [],
   sharedResources: [],
-  sharedParticipants: [],
 };
 
 // facts -> { category, status, severity }, or null when nothing is wrong.
@@ -90,7 +85,6 @@ function pairFacts(eventA, eventB) {
     sharedVenue: eventA.venue === eventB.venue,
     sharedJudges: itemsInBoth(eventA.judgeIds, eventB.judgeIds),
     sharedResources: itemsInBoth(eventA.resources, eventB.resources),
-    sharedParticipants: itemsInBoth(eventA.participants, eventB.participants),
   };
 }
 

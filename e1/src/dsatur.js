@@ -6,7 +6,6 @@
 // The conflict graph:
 //   - Every event is a node.
 //   - Two events are joined by an edge when they must NOT run at the same time:
-//       * they share a registered student, or
 //       * they need the same named resource (e.g. the only projector), or
 //       * they want the same venue on the same date.
 //
@@ -24,7 +23,7 @@
 
 // events:  any list
 // keysOf:  function(event) -> list of strings. Two events that share a key get an edge.
-//          Example keys: "student:s1", "res:projector".
+//          Example keys: "res:projector", "venue:Lab 1@2026-11-25".
 // returns: neighbours[i] = Set of indexes of events that clash with event i
 function buildConflictGraph(events, keysOf) {
   const neighbours = events.map(() => new Set());

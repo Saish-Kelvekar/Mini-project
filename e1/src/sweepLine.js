@@ -3,13 +3,13 @@
 //
 // Part 1, INTERVAL TREE: stores time intervals and answers
 //     "Which stored intervals overlap the time range [start, end)?"
-// E1 keeps one tree per venue, judge, resource and student, and asks it
+// E1 keeps one tree per venue, judge and resource, and asks it
 // "is anything booked at this time?" before trying a slot.
 //   - It is a binary search tree ordered by interval START time.
 //   - Every node also remembers `maxEnd`: the latest END time in its subtree.
 //     That lets a search skip a whole subtree that cannot reach our time.
 //   - It does not rebalance itself. That keeps it easy to read, and each tree
-//     only holds one venue's / judge's / student's bookings, so it stays small.
+//     only holds one venue's / judge's / resource's bookings, so it stays small.
 // Intervals are half-open [start, end): an event ending at 10:00 does NOT
 // clash with one starting at 10:00.
 //

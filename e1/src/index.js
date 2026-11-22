@@ -5,9 +5,12 @@
 // using the three agreed algorithms:
 //   dsatur.js     DSATUR graph colouring      -> which event to schedule first
 //   sweepLine.js  sweep-line + interval tree  -> is a slot free? which events overlap?
-//   classify.js   rule-based classification   -> critical / resource / participant / acceptable
+//   classify.js   rule-based classification   -> critical / resource / acceptable
 //
-//   Step 1  Read events + registrations (+ existing schedules from E3)
+//   Step 1  Read events (+ existing schedules from E3)
+//
+// Students register only AFTER the timetable is published, so E1 never
+// uses registrations: they play no part in DSATUR or in slot selection.
 //   Step 2  DSATUR order: most constrained event first
 //   Step 3  For each event, check candidate slots with interval trees
 //   Step 4  Ask E2 to reserve. BUSY -> mark slot unavailable, try another judge
@@ -88,10 +91,6 @@ function parseResources(input) {
 
 // An event as E4 stores it -> the fields E1 needs.
 function normaliseEvent(event) {
-  let students = [];
-  if (Array.isArray(event.participants)) students = event.participants;
-  else if (Array.isArray(event.registrations)) students = event.registrations.map((r) => r.studentId ?? r);
-
   let duration = Number(event.durationMinutes ?? event.duration);
   if (isNaN(duration)) duration = Math.round(Number(event.durationHours) * 60);
 
@@ -104,7 +103,6 @@ function normaliseEvent(event) {
     preferredVenue: (event.preferredVenue || '').trim(),
     preferredDate: isValidDate(event.preferredDate) ? event.preferredDate : '',
     resources: parseResources(event.resourcesRequired ?? event.resources),
-    participants: [...new Set(students.map(String))],
   };
 }
 
@@ -117,14 +115,13 @@ function chooseBaseDate(startDate, events) {
 }
 
 // ---------------------------------------------------------------------------
-// Bookings: one interval tree per venue / judge / resource / student
+// Bookings: one interval tree per venue / judge / resource
 // ---------------------------------------------------------------------------
 
 // Keys are used for the trees and as resource ids sent to E2.
 const venueKey = (venue) => `venue:${venue}`;
 const judgeKey = (judgeId) => `judge:${judgeId}`;
 const resourceKey = (resource) => `res:${resource}`;
-const studentKey = (studentId) => `student:${studentId}`;
 
 class Bookings {
   constructor(judges) {
@@ -164,7 +161,6 @@ class Bookings {
       venueKey(placement.venue),
       ...placement.judgeIds.map(judgeKey),
       ...placement.resources.map(resourceKey),
-      ...placement.participants.map(studentKey),
     ];
     for (const key of keys) this.tree(key).insert({ ...interval });
     for (const judgeId of placement.judgeIds) {
@@ -227,7 +223,7 @@ function connectToE2() {
 
 // Try one candidate (day, venue, start time).
 // Returns { placement }, or { venueBusyUntil } when the venue is taken, or {}.
-async function trySlot(run, event, eventIndex, day, venue, time, allowStudentClash, busyReplies) {
+async function trySlot(run, event, eventIndex, day, venue, time, busyReplies) {
   const { bookings, e2 } = run;
   const start = day * MINUTES_PER_DAY + time;
   const end = start + event.duration;
@@ -236,7 +232,6 @@ async function trySlot(run, event, eventIndex, day, venue, time, allowStudentCla
   const venueClash = bookings.clash(venueKey(venue), start, end);
   if (venueClash) return { venueBusyUntil: venueClash.end - day * MINUTES_PER_DAY };
   if (!bookings.allFree(event.resources.map(resourceKey), start, end)) return {};
-  if (!allowStudentClash && !bookings.allFree(event.participants.map(studentKey), start, end)) return {};
 
   // Step 4: pick judges and ask E2. Loop, because a busy judge can be swapped
   // for another one without moving the event.
@@ -253,7 +248,7 @@ async function trySlot(run, event, eventIndex, day, venue, time, allowStudentCla
     });
     if (reply.status === 'RESERVED') {
       return { placement: { eventId: event.id, name: event.name, venue, day, startAbs: start, endAbs: end, judgeIds,
-                            resources: event.resources, participants: event.participants, group: run.groupOf[eventIndex] } };
+                            resources: event.resources, group: run.groupOf[eventIndex] } };
     }
 
     // BUSY is not critical. Remember it (reported as a resolved resource conflict) and retry.
@@ -272,7 +267,7 @@ async function trySlot(run, event, eventIndex, day, venue, time, allowStudentCla
   }
 }
 
-async function findSlotOnDay(run, event, eventIndex, day, venues, allowStudentClash, busyReplies) {
+async function findSlotOnDay(run, event, eventIndex, day, venues, busyReplies) {
   const { dayStart, dayEnd, step } = run.settings;
   const latestStart = dayEnd - event.duration;
 
@@ -281,7 +276,7 @@ async function findSlotOnDay(run, event, eventIndex, day, venues, allowStudentCl
   const groupStart = run.groupStarts.get(`${run.groupOf[eventIndex]}@${day}`);
   if (groupStart !== undefined && groupStart <= latestStart) {
     for (const venue of venues) {
-      const attempt = await trySlot(run, event, eventIndex, day, venue, groupStart, allowStudentClash, busyReplies);
+      const attempt = await trySlot(run, event, eventIndex, day, venue, groupStart, busyReplies);
       if (attempt.placement) return attempt.placement;
     }
   }
@@ -291,7 +286,7 @@ async function findSlotOnDay(run, event, eventIndex, day, venues, allowStudentCl
   for (let time = dayStart; time <= latestStart; time += step) {
     for (const venue of venues) {
       if ((venueBusyUntil.get(venue) || 0) > time) continue;
-      const attempt = await trySlot(run, event, eventIndex, day, venue, time, allowStudentClash, busyReplies);
+      const attempt = await trySlot(run, event, eventIndex, day, venue, time, busyReplies);
       if (attempt.placement) return attempt.placement;
       if (attempt.venueBusyUntil !== undefined) venueBusyUntil.set(venue, attempt.venueBusyUntil);
     }
@@ -300,7 +295,7 @@ async function findSlotOnDay(run, event, eventIndex, day, venues, allowStudentCl
 }
 
 // Preferred date first (then later days, then earlier days), preferred venue first.
-async function findSlot(run, event, eventIndex, allowStudentClash, busyReplies) {
+async function findSlot(run, event, eventIndex, busyReplies) {
   const preferredDay = event.preferredDate ? dateToDay(event.preferredDate, run.baseDate) : 0;
   const days = [];
   for (let day = Math.max(0, preferredDay); day <= run.lastDay; day++) days.push(day);
@@ -312,7 +307,7 @@ async function findSlot(run, event, eventIndex, allowStudentClash, busyReplies) 
 
   for (const day of days) {
     for (const venues of venueOrder) {
-      const placement = await findSlotOnDay(run, event, eventIndex, day, venues, allowStudentClash, busyReplies);
+      const placement = await findSlotOnDay(run, event, eventIndex, day, venues, busyReplies);
       if (placement) return placement;
     }
   }
@@ -336,9 +331,7 @@ async function scheduleEvent(run, event, eventIndex) {
 
   let reason = reasonCannotSchedule(event, run.settings, run.judges.length);
   if (!reason) {
-    // First try keeps registered students free of clashes; second try allows it (participant warning).
-    placement = await findSlot(run, event, eventIndex, false, busyReplies);
-    if (!placement && event.participants.length > 0) placement = await findSlot(run, event, eventIndex, true, busyReplies);
+    placement = await findSlot(run, event, eventIndex, busyReplies);
     if (!placement) reason = `No free venue, judge and resource combination in ${run.lastDay + 1} day(s).`;
   }
 
@@ -400,8 +393,7 @@ async function generateTimetable(rawEvents, options = {}) {
     const day = dateToDay(entry.date, baseDate);
     const placement = { ...entry, day,
       startAbs: day * MINUTES_PER_DAY + fromClock(entry.start), endAbs: day * MINUTES_PER_DAY + fromClock(entry.end),
-      judgeIds: (entry.judgeIds || []).map(String), resources: parseResources(entry.resources),
-      participants: (entry.participants || []).map(String), existing: true };
+      judgeIds: (entry.judgeIds || []).map(String), resources: parseResources(entry.resources), existing: true };
     bookings.book(placement);
     await e2.checkAndReserve({ eventId: placement.eventId, start: placement.startAbs, end: placement.endAbs,
       resourceIds: [venueKey(placement.venue), ...placement.judgeIds.map(judgeKey), ...placement.resources.map(resourceKey)] });
@@ -409,10 +401,10 @@ async function generateTimetable(rawEvents, options = {}) {
   }
 
   // ---- Step 2: DSATUR ----
-  // Two events are joined in the conflict graph when they share a student, a
-  // resource, or the same preferred venue on the same date.
+  // Two events are joined in the conflict graph when they need the same
+  // resource or the same preferred venue on the same date. (No students:
+  // they register only after the timetable is published.)
   const graph = buildConflictGraph(events, (event) => [
-    ...event.participants.map(studentKey),
     ...event.resources.map(resourceKey),
     ...(event.preferredVenue && event.preferredDate ? [`${venueKey(event.preferredVenue)}@${event.preferredDate}`] : []),
   ]);
@@ -444,7 +436,6 @@ async function generateTimetable(rawEvents, options = {}) {
     const facts = pairFacts(first, second);
     const result = classify(facts);
     let detail = 'Runs in parallel in a different venue.';
-    if (result.category === 'participant') detail = `${facts.sharedParticipants.length} registered student(s) are in both events.`;
     if (result.category === 'critical') detail = 'Same venue, judge or resource booked twice.';
     conflicts.push({ ...result, type: 'OVERLAP', eventIds: [first.eventId, second.eventId],
       eventNames: [first.name, second.name], start: Math.max(first.start, second.start), detail });
@@ -473,7 +464,6 @@ async function generateTimetable(rawEvents, options = {}) {
       judges: p.judgeIds.map((id) => judgeNames.get(id) || id).join(', '),
       judgeIds: p.judgeIds,
       resources: p.resources,
-      participantCount: p.participants.length,
       group: p.group ?? null,
       existing: Boolean(p.existing),
     }));
@@ -485,7 +475,6 @@ async function generateTimetable(rawEvents, options = {}) {
     unplaced: unplaced.length,
     critical: count('critical'),
     resource: count('resource'),
-    participant: count('participant'),
     acceptable: count('acceptable'),
     groups: new Set(groupOf).size,
     e2: e2.source,
