@@ -338,7 +338,6 @@ e3/
 │   ├── publishing.test.js    # Publishing lifecycle, conflict blocking, advisory locks tests
 │   ├── api.test.js           # REST API endpoints & Express integration tests
 │   └── helpers.js            # Shared test runner setup & fixtures
-├── legacy_python/            # Archived Python files
 ├── .env.example              # Environment variables template
 ├── .gitignore                # Protects .env and node_modules from Git
 ├── package.json              # ES Modules / Node test runner scripts
